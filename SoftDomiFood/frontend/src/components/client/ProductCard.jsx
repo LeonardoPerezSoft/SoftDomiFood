@@ -1,7 +1,8 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
+import ProductReviews from './ProductReviews';
 
-const ProductCard = ({ product, onAddToCart }) => {
+const ProductCard = ({ product, onAddToCart, user, toast }) => {
   return (
     <div className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
       <img
@@ -25,6 +26,9 @@ const ProductCard = ({ product, onAddToCart }) => {
             <span>Agregar</span>
           </button>
         </div>
+      </div>
+      <div className="p-6 pt-0">
+        <ProductReviews productId={product.id} user={user} toast={toast} />
       </div>
     </div>
   );

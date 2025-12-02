@@ -358,6 +358,8 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
                       key={product.id}
                       product={product}
                       onAddToCart={addToCart}
+                      user={user}
+                      toast={toast}
                     />
                   ))}
                 </div>

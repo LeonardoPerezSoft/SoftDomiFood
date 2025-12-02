@@ -481,3 +481,68 @@ async def get_all_customers_with_addresses() -> List[Dict[str, Any]]:
     finally:
         await conn.close()
 
+async def user_can_review_product(user_id: str, product_id: str) -> Optional[str]:
+    """Verifica si el usuario puede reseñar el producto; retorna orderId válido si se puede."""
+    conn = await get_connection()
+    try:
+        row = await conn.fetchrow(
+            """
+            SELECT oi."orderId" AS order_id
+            FROM order_items oi
+            JOIN orders o ON oi."orderId" = o.id
+            WHERE o."userId" = $1 AND oi."productId" = $2 AND o.status = 'DELIVERED'
+            ORDER BY o."createdAt" DESC
+            LIMIT 1
+            """,
+            user_id, product_id
+        )
+        if row:
+            return str(row["order_id"]) if row["order_id"] else None
+        return None
+    finally:
+        await conn.close()
+
+async def create_review(user_id: str, product_id: str, order_id: str, rating: int, comment: Optional[str]) -> Dict[str, Any]:
+    """Crea una reseña si no existe para esa combinación (usuario, producto, orden)."""
+    conn = await get_connection()
+    try:
+        review = await conn.fetchrow(
+            """
+            INSERT INTO reviews (id, "userId", "productId", "orderId", rating, comment, "createdAt")
+            VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NOW())
+            RETURNING id, "userId", "productId", "orderId", rating, comment, "createdAt"
+            """,
+            user_id, product_id, order_id, rating, comment
+        )
+        return convert_uuid_to_str(dict(review))
+    finally:
+        await conn.close()
+
+async def get_product_reviews(product_id: str) -> Dict[str, Any]:
+    """Obtiene reseñas y promedio de un producto."""
+    conn = await get_connection()
+    try:
+        rows = await conn.fetch(
+            """
+            SELECT r.id, r."userId", r."productId", r."orderId", r.rating, r.comment, r."createdAt",
+                   u.name AS user_name
+            FROM reviews r
+            JOIN users u ON r."userId" = u.id
+            WHERE r."productId" = $1
+            ORDER BY r."createdAt" DESC
+            """,
+            product_id
+        )
+        reviews = [convert_uuid_to_str(dict(r)) for r in rows]
+        avg_row = await conn.fetchrow(
+            """
+            SELECT COALESCE(AVG(rating), 0) AS avg
+            FROM reviews WHERE "productId" = $1
+            """,
+            product_id
+        )
+        average = float(avg_row["avg"] or 0) if avg_row else 0.0
+        return {"average": average, "reviews": reviews}
+    finally:
+        await conn.close()
+

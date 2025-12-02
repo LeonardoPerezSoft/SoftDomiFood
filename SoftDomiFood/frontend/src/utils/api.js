@@ -150,4 +150,16 @@ export const addressesAPI = {
   },
 };
 
+// Reviews
+export const reviewsAPI = {
+  create: async ({ productId, rating, comment }) => {
+    const response = await api.post('/reviews', { productId, rating, comment });
+    return response.data;
+  },
+  getByProduct: async (productId) => {
+    const response = await api.get(`/products/${productId}/reviews`);
+    return response.data;
+  },
+};
+
 export default api;

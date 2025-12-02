@@ -6,7 +6,7 @@ import os
 from dotenv import load_dotenv
 
 from database import engine, Base, get_db
-from routers import auth, products, orders, admin, addresses
+from routers import auth, products, orders, admin, addresses, reviews
 from init_db import init_database, check_tables_exist, create_admin_user
 from services.rabbitmq import get_channel, close_connection
 
@@ -92,6 +92,7 @@ app.include_router(products.router, prefix="/api/products", tags=["products"])
 app.include_router(orders.router, prefix="/api/orders", tags=["orders"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(addresses.router, prefix="/api", tags=["addresses"])
+app.include_router(reviews.router, prefix="/api", tags=["reviews"])
 
 @app.get("/")
 async def root():
