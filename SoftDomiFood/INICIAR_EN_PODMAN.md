@@ -33,7 +33,7 @@ Start-Sleep -Seconds 15
 
 ### 6. Construir e iniciar API
 ```powershell
-cd C:\Users\yesid.perez\Desktop\TrainingIA\SoftDomiFood\SoftDomiFood
+cd C:\Users\rutadelacarpeta..\SoftDomiFood
 podman build -t softdomifood-api ./api
 podman run -d --name softdomifood-api --network softdomifood-network -e DATABASE_URL=postgresql://softdomifood_user:softdomifood_pass@softdomifood-db:5432/softdomifood_db -e RABBITMQ_URL=amqp://admin:admin123@softdomifood-rabbitmq:5672/ -e JWT_SECRET=your-super-secret-jwt-key-change-in-production -e JWT_EXPIRES_IN=7d -e PORT=5000 -e "CORS_ORIGIN=http://localhost:3000,http://localhost:3001" -p 5000:5000 -v ${PWD}/api:/app:z softdomifood-api
 ```
@@ -65,8 +65,7 @@ podman ps
 
 - **Frontend Cliente**: http://localhost:3000
 - **Frontend Admin**: http://localhost:3001
-- **API Backend**: http://localhost:5000
-- **API Docs**: http://localhost:5000/docs
+- **API**: http://localhost:5000
 - **RabbitMQ Management**: http://localhost:15672 (usuario: admin, contraseña: admin123)
 
 ## Comandos útiles

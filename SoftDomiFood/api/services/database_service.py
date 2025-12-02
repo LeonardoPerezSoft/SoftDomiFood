@@ -9,10 +9,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
+ASYNC_PG_URL = os.getenv("ASYNC_PG_URL", DATABASE_URL)
 
 async def get_connection():
     """Obtener conexión a PostgreSQL"""
-    return await asyncpg.connect(DATABASE_URL)
+    return await asyncpg.connect(ASYNC_PG_URL)
 
 def convert_uuid_to_str(data: Any) -> Any:
     """Convertir UUIDs y fechas a strings en diccionarios o listas"""

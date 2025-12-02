@@ -237,7 +237,7 @@ Una vez iniciados los servicios, el sistema estará disponible en:
 |----------|-----|-------------|
 | **Frontend Cliente** | http://localhost:3000 | Interfaz para clientes |
 | **Frontend Admin** | http://localhost:3001 | Panel de administración |
-| **API Backend** | http://localhost:5000 | API REST |
+| **API** | http://localhost:5000 | API REST |
 | **API Docs** | http://localhost:5000/docs | Documentación interactiva (Swagger) |
 | **RabbitMQ Management** | http://localhost:15672 | Interfaz de gestión RabbitMQ |
 
@@ -355,10 +355,8 @@ Este documento define la metodología **"AI-First Development"** utilizada en el
 | Documento | Descripción |
 |-----------|-------------|
 | [DESARROLLO-LOCAL.md](./SoftDomiFood/DESARROLLO-LOCAL.md) | Guía para desarrollo local |
-| [SETUP_INSTRUCTIONS.md](./SETUP_INSTRUCTIONS.md) | Instrucciones detalladas de configuración |
 | [qa_automated/README.md](./qa_automated/README.md) | Documentación completa de testing |
-| [MIGRATION_SUMMARY.md](./MIGRATION_SUMMARY.md) | Resumen de migraciones de base de datos |
-| [FINAL_SUMMARY.md](./FINAL_SUMMARY.md) | Resumen final de implementaciones |
+
 
 ### Contribución
 
