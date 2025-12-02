@@ -13,6 +13,9 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
   const [addresses, setAddresses] = useState([]);
   const [orders, setOrders] = useState([]);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
+    // ✅ Pedido programado
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduledFor, setScheduledFor] = useState(""); // formato datetime-local: yyyy-mm-ddThh:mm
   const [activeTab, setActiveTab] = useState('menu');
   const [orderForm, setOrderForm] = useState({
     notes: '',
@@ -205,6 +208,11 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
       toast.warning('Los administradores no pueden realizar pedidos desde esta vista');
       return;
     }
+
+        if (scheduleEnabled && !scheduledFor) {
+      toast.warning('Debes elegir la fecha y hora para programar el pedido');
+      return;
+    }
     
     if (cart.length === 0) {
       toast.warning('El carrito está vacío');
@@ -238,13 +246,16 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
         paymentMethod: orderForm.paymentMethod,
         notes: orderForm.notes || null,
         total: total,  // Incluir el total calculado
-        couponCode: appliedCoupon ? appliedCoupon.code : null  // Incluir código de cupón si existe
+        couponCode: appliedCoupon ? appliedCoupon.code : null,  // Incluir código de cupón si existe
+        scheduledFor: scheduleEnabled && scheduledFor ? scheduledFor : null,
       };
 
       await ordersAPI.create(orderData);
       setCart([]);
       setAppliedCoupon(null);  // Limpiar cupón aplicado
       setOrderForm({ notes: '', addressId: '', paymentMethod: 'CASH' });
+      setScheduleEnabled(false);  // Limpiar estado de programación
+      setScheduledFor("");  // Limpiar fecha programada
       toast.success('¡Pedido realizado con éxito!');
       loadOrders();
       setActiveTab('orders'); // Cambiar a la pestaña de pedidos
@@ -268,6 +279,8 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
     setAddresses([]);
     setOrders([]);
     setCart([]);
+    setScheduleEnabled(false);  // Limpiar estado de programación
+    setScheduledFor("");  // Limpiar fecha programada
     setActiveTab('menu');
     toast.info('Sesión cerrada correctamente');
   };
@@ -391,6 +404,13 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
                   onPlaceOrder={handlePlaceOrder}
                   onAddressAdded={handleAddressAdded}
                   disabled={cart.length === 0 || !user}
+                  toast={toast}
+
+                  // ✅ NUEVO
+                  scheduleEnabled={scheduleEnabled}
+                  scheduledFor={scheduledFor}
+                  onScheduleEnabledChange={setScheduleEnabled}
+                  onScheduledForChange={setScheduledFor}
                 />
               )}
             </div>

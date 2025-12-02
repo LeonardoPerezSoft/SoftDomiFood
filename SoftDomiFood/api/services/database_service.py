@@ -70,23 +70,35 @@ async def get_product_by_id(product_id: str) -> Optional[Dict[str, Any]]:
     finally:
         await conn.close()
 
-async def create_order(user_id: str, address_id: str, items: List[Dict], total: float, payment_method: str = "CASH", notes: Optional[str] = None,
-                      coupon_code: Optional[str] = None, discount_applied: float = 0.0) -> Dict[str, Any]:
-    """Crear pedido en la base de datos"""
+async def create_order(
+    user_id: str,
+    address_id: str,
+    items: List[Dict],
+    total: float,
+    payment_method: str = "CASH",
+    notes: Optional[str] = None,
+    coupon_code: Optional[str] = None,
+    discount_applied: float = 0.0,
+    status: str = "PENDING",
+    scheduled_for: Optional[datetime] = None
+) -> Dict[str, Any]:
+    """Crear pedido en la base de datos (soporta programado con status=SCHEDULED y scheduledFor)"""
     conn = await get_connection()
     try:
         async with conn.transaction():
-            # Crear orden
             order_id = await conn.fetchval(
                 """
-                INSERT INTO orders (id, "userId", "addressId", status, total, "paymentMethod", notes, coupon_code, discount_applied, "createdAt", "updatedAt")
-                VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+                INSERT INTO orders (
+                    id, "userId", "addressId", status, total, "paymentMethod", notes,
+                    coupon_code, discount_applied, "scheduledFor", "createdAt", "updatedAt"
+                )
+                VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
                 RETURNING id
                 """,
-                user_id, address_id, "PENDING", total, payment_method, notes, coupon_code, discount_applied
+                user_id, address_id, status, total, payment_method, notes,
+                coupon_code, discount_applied, scheduled_for
             )
-            
-            # Crear items de la orden
+
             for item in items:
                 await conn.execute(
                     """
@@ -95,22 +107,21 @@ async def create_order(user_id: str, address_id: str, items: List[Dict], total: 
                     """,
                     order_id, item["productId"], item["quantity"], item["price"]
                 )
-            
-            # Obtener orden completa con items
+
             order = await conn.fetchrow(
                 """
-                SELECT id, "userId", "addressId", status, total, "paymentMethod", notes, coupon_code, discount_applied, "createdAt", "updatedAt"
+                SELECT id, "userId", "addressId", status, total, "paymentMethod", notes,
+                       coupon_code, discount_applied, "scheduledFor", "createdAt", "updatedAt"
                 FROM orders WHERE id = $1
                 """,
                 order_id
             )
-            
+
             if not order:
                 return None
-            
+
             order_dict = convert_uuid_to_str(dict(order))
-            
-            # Agregar items a la orden
+
             order_items = await conn.fetch(
                 """
                 SELECT "productId", quantity, price
@@ -119,19 +130,19 @@ async def create_order(user_id: str, address_id: str, items: List[Dict], total: 
                 """,
                 order_id
             )
-            # Convertir items y asegurar formato consistente
+
             items_list = []
             for item in order_items:
                 item_dict = convert_uuid_to_str(dict(item))
-                # Asegurar que productId esté presente (puede venir como product_id)
                 if 'productId' not in item_dict and 'product_id' in item_dict:
                     item_dict['productId'] = item_dict.pop('product_id')
                 items_list.append(item_dict)
+
             order_dict['items'] = items_list
-            
             return order_dict
     finally:
         await conn.close()
+
 
 async def get_coupon_by_code(code: str) -> Optional[Dict[str, Any]]:
     """Obtener cupón por código"""
@@ -199,12 +210,12 @@ async def register_coupon_usage(coupon_id: str, user_id: str, order_id: str) -> 
         await conn.close()
 
 async def get_order_status(order_id: str) -> Optional[Dict[str, Any]]:
-    """Obtener estado de un pedido"""
+    """Obtener estado de un pedido (incluye scheduledFor)"""
     conn = await get_connection()
     try:
         order = await conn.fetchrow(
             """
-            SELECT id, status, total, "paymentMethod", coupon_code, discount_applied, "createdAt", "updatedAt"
+            SELECT id, status, total, "paymentMethod", coupon_code, discount_applied, "scheduledFor", "createdAt", "updatedAt"
             FROM orders WHERE id = $1
             """,
             order_id
@@ -213,8 +224,9 @@ async def get_order_status(order_id: str) -> Optional[Dict[str, Any]]:
     finally:
         await conn.close()
 
+
 async def get_user_orders(user_id: str) -> List[Dict[str, Any]]:
-    """Obtener todas las órdenes de un usuario específico"""
+    """Obtener todas las órdenes de un usuario específico (incluye scheduledFor)"""
     conn = await get_connection()
     try:
         orders = await conn.fetch(
@@ -227,6 +239,7 @@ async def get_user_orders(user_id: str) -> List[Dict[str, Any]]:
                 o.notes,
                 o.coupon_code,
                 o.discount_applied,
+                o."scheduledFor",
                 o."createdAt", 
                 o."updatedAt",
                 o."addressId"
@@ -236,10 +249,9 @@ async def get_user_orders(user_id: str) -> List[Dict[str, Any]]:
             """,
             user_id
         )
-        
+
         orders_list = [convert_uuid_to_str(dict(row)) for row in orders]
-        
-        # Para cada orden, obtener sus items
+
         for order in orders_list:
             items = await conn.fetch(
                 """
@@ -259,7 +271,7 @@ async def get_user_orders(user_id: str) -> List[Dict[str, Any]]:
                 order['id']
             )
             order['items'] = [convert_uuid_to_str(dict(item)) for item in items]
-        
+
         return orders_list
     finally:
         await conn.close()
@@ -310,10 +322,9 @@ async def create_user(email: str, hashed_password: str, name: str, phone: Option
         await conn.close()
 
 async def get_all_orders() -> List[Dict[str, Any]]:
-    """Obtener todos los pedidos con información completa del cliente, dirección y productos (admin)"""
+    """Obtener todos los pedidos (admin) incluyendo scheduledFor"""
     conn = await get_connection()
     try:
-        # Obtener órdenes con información del cliente y dirección
         orders = await conn.fetch(
             """
             SELECT 
@@ -324,14 +335,13 @@ async def get_all_orders() -> List[Dict[str, Any]]:
                 o.notes,
                 o.coupon_code,
                 o.discount_applied,
+                o."scheduledFor",
                 o."createdAt", 
                 o."updatedAt",
-                -- Datos del cliente
                 u.id as customer_id,
                 u.name as customer_name, 
                 u.email as customer_email,
                 u.phone as customer_phone,
-                -- Datos de dirección de entrega
                 a.street as delivery_street,
                 a.city as delivery_city,
                 a.state as delivery_state,
@@ -344,11 +354,9 @@ async def get_all_orders() -> List[Dict[str, Any]]:
             ORDER BY o."createdAt" DESC
             """
         )
-        
-        # Convertir a lista de diccionarios y agregar items
+
         orders_list = [convert_uuid_to_str(dict(row)) for row in orders]
-        
-        # Para cada orden, obtener sus items con información del producto
+
         for order in orders_list:
             items = await conn.fetch(
                 """
@@ -368,7 +376,7 @@ async def get_all_orders() -> List[Dict[str, Any]]:
                 order['id']
             )
             order['items'] = [convert_uuid_to_str(dict(item)) for item in items]
-        
+
         return orders_list
     finally:
         await conn.close()
@@ -634,4 +642,85 @@ async def get_all_customers_with_addresses() -> List[Dict[str, Any]]:
         return customers_list
     finally:
         await conn.close()
+
+async def get_due_scheduled_order_ids(limit: int = 50) -> List[str]:
+    """IDs de pedidos programados que ya deben liberarse"""
+    conn = await get_connection()
+    try:
+        rows = await conn.fetch(
+            """
+            SELECT id
+            FROM orders
+            WHERE status = 'SCHEDULED'
+              AND "scheduledFor" IS NOT NULL
+              AND "scheduledFor" <= NOW()
+            ORDER BY "scheduledFor" ASC
+            LIMIT $1
+            """,
+            limit
+        )
+        return [str(r["id"]) for r in rows]
+    finally:
+        await conn.close()
+
+async def claim_scheduled_order(order_id: str) -> bool:
+    """
+    Reclama un pedido programado para liberarlo (evita doble disparo).
+    Pasa SCHEDULED -> PENDING solo si ya está vencido.
+    """
+    conn = await get_connection()
+    try:
+        row = await conn.fetchrow(
+            """
+            UPDATE orders
+            SET status = 'PENDING', "updatedAt" = NOW()
+            WHERE id = $1
+              AND status = 'SCHEDULED'
+              AND "scheduledFor" IS NOT NULL
+              AND "scheduledFor" <= NOW()
+            RETURNING id
+            """,
+            order_id
+        )
+        return bool(row)
+    finally:
+        await conn.close()
+
+async def get_order_by_id_full(order_id: str) -> Optional[Dict[str, Any]]:
+    """Orden completa para publicar a Rabbit (incluye items)"""
+    conn = await get_connection()
+    try:
+        order = await conn.fetchrow(
+            """
+            SELECT id, "userId", "addressId", status, total, "paymentMethod", notes,
+                   coupon_code, discount_applied, "scheduledFor", "createdAt", "updatedAt"
+            FROM orders
+            WHERE id = $1
+            """,
+            order_id
+        )
+        if not order:
+            return None
+        order_dict = convert_uuid_to_str(dict(order))
+
+        order_items = await conn.fetch(
+            """
+            SELECT "productId", quantity, price
+            FROM order_items
+            WHERE "orderId" = $1
+            """,
+            order_id
+        )
+        items_list = []
+        for item in order_items:
+            item_dict = convert_uuid_to_str(dict(item))
+            if 'productId' not in item_dict and 'product_id' in item_dict:
+                item_dict['productId'] = item_dict.pop('product_id')
+            items_list.append(item_dict)
+
+        order_dict["items"] = items_list
+        return order_dict
+    finally:
+        await conn.close()
+
 

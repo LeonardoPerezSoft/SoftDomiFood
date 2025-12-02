@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Package, CheckCircle, X, MapPin, DollarSign, CreditCard } from 'lucide-react';
+import { Clock, Package, CheckCircle, X, CalendarClock, MapPin, DollarSign, CreditCard } from 'lucide-react';
 import { ordersAPI } from '../../utils/api';
 
 const MyOrders = ({ user, toast }) => {
@@ -9,7 +9,6 @@ const MyOrders = ({ user, toast }) => {
   useEffect(() => {
     if (user) {
       loadOrders();
-      // Recargar órdenes cada 10 segundos para ver actualizaciones
       const interval = setInterval(loadOrders, 10000);
       return () => clearInterval(interval);
     }
@@ -17,7 +16,7 @@ const MyOrders = ({ user, toast }) => {
 
   const loadOrders = async () => {
     if (!user) return;
-    
+
     try {
       setLoading(true);
       const data = await ordersAPI.getAll();
@@ -25,7 +24,7 @@ const MyOrders = ({ user, toast }) => {
       setOrders(ordersList);
     } catch (error) {
       console.error('Error loading orders:', error);
-      toast.error('Error al cargar tus pedidos');
+      toast?.error?.('Error al cargar tus pedidos');
       setOrders([]);
     } finally {
       setLoading(false);
@@ -33,8 +32,9 @@ const MyOrders = ({ user, toast }) => {
   };
 
   const getStatusColor = (status) => {
-    const statusLower = status?.toLowerCase();
-    switch (statusLower) {
+    const s = status?.toLowerCase();
+    switch (s) {
+      case 'scheduled': return 'bg-blue-100 text-blue-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'confirmed': return 'bg-blue-100 text-blue-800';
       case 'preparing': return 'bg-blue-100 text-blue-800';
@@ -47,8 +47,9 @@ const MyOrders = ({ user, toast }) => {
   };
 
   const getStatusIcon = (status) => {
-    const statusLower = status?.toLowerCase();
-    switch (statusLower) {
+    const s = status?.toLowerCase();
+    switch (s) {
+      case 'scheduled': return <CalendarClock className="w-4 h-4" />;
       case 'pending': return <Clock className="w-4 h-4" />;
       case 'confirmed': return <Clock className="w-4 h-4" />;
       case 'preparing': return <Package className="w-4 h-4" />;
@@ -61,17 +62,18 @@ const MyOrders = ({ user, toast }) => {
   };
 
   const getStatusText = (status) => {
-    const statusLower = status?.toLowerCase();
-    const statusMap = {
-      'pending': 'Pendiente',
-      'confirmed': 'Confirmado',
-      'preparing': 'En Preparación',
-      'ready': 'Listo',
-      'on_delivery': 'En Camino',
-      'delivered': 'Entregado',
-      'cancelled': 'Cancelado'
+    const s = status?.toLowerCase();
+    const map = {
+      scheduled: 'Programado',
+      pending: 'Pendiente',
+      confirmed: 'Confirmado',
+      preparing: 'En Preparación',
+      ready: 'Listo',
+      on_delivery: 'En Camino',
+      delivered: 'Entregado',
+      cancelled: 'Cancelado',
     };
-    return statusMap[statusLower] || status;
+    return map[s] || status;
   };
 
   const formatDate = (dateString) => {
@@ -122,7 +124,7 @@ const MyOrders = ({ user, toast }) => {
           {orders.map((order) => {
             const status = (order.status || 'PENDING').toLowerCase();
             const items = order.items || [];
-            
+
             return (
               <div
                 key={order.id}
@@ -133,19 +135,36 @@ const MyOrders = ({ user, toast }) => {
                     <h3 className="font-semibold text-gray-800">
                       Pedido #{order.id.substring(0, 8)}
                     </h3>
+
                     <p className="text-sm text-gray-600 mt-1">
                       Fecha: {formatDate(order.createdAt)}
                     </p>
+
+                    {/* ✅ Programado para */}
+                    {order.scheduledFor && (
+                      <p className="text-sm text-blue-700 mt-1 flex items-center gap-1">
+                        <CalendarClock className="w-4 h-4" />
+                        Programado para: {formatDate(order.scheduledFor)}
+                      </p>
+                    )}
                   </div>
+
                   <div className="flex items-center space-x-2">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(status)}`}
+                    >
                       {getStatusIcon(status)}
                       <span className="ml-1">{getStatusText(status)}</span>
                     </span>
+
                     {order.paymentMethod && (
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        order.paymentMethod === 'CARD' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                      }`}>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          order.paymentMethod === 'CARD'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-green-100 text-green-800'
+                        }`}
+                      >
                         {order.paymentMethod === 'CARD' ? (
                           <CreditCard className="w-3 h-3 mr-1" />
                         ) : (
@@ -182,14 +201,17 @@ const MyOrders = ({ user, toast }) => {
                     <MapPin className="w-4 h-4 mr-1" />
                     <span>Dirección de entrega registrada</span>
                   </div>
-                  
-                  {/* Mostrar desglose de precios con cupón si aplica */}
+
                   <div className="space-y-2">
                     {order.coupon_code && order.discount_applied > 0 ? (
                       <>
                         <div className="flex justify-between text-sm text-gray-600">
                           <span>Subtotal:</span>
-                          <span>${((parseFloat(order.total) || 0) + (parseFloat(order.discount_applied) || 0)).toFixed(2)}</span>
+                          <span>
+                            ${(
+                              (parseFloat(order.total) || 0) + (parseFloat(order.discount_applied) || 0)
+                            ).toFixed(2)}
+                          </span>
                         </div>
                         <div className="flex justify-between text-sm text-green-600 font-medium">
                           <span>Cupón aplicado ({order.coupon_code}):</span>
@@ -226,4 +248,3 @@ const MyOrders = ({ user, toast }) => {
 };
 
 export default MyOrders;
-
