@@ -40,4 +40,4 @@ database/backups/backup_*.sql
 # Docker
 .dockerignore
 
-
+.vscode/
