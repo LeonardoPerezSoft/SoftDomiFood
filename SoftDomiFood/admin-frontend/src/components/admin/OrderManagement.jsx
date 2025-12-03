@@ -79,7 +79,7 @@ const OrderManagement = ({ orders = [], onStatusChange }) => {
     const s = normalizeStatus(status);
     const map = {
       ALL: 'Todos',
-      SCHEDULED: 'Scheduled',
+      SCHEDULED: 'Programado',
       PENDING: 'Pendiente',
       CONFIRMED: 'Confirmado',
       PREPARING: 'Preparando',
