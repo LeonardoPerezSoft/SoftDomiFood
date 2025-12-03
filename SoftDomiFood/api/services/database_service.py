@@ -725,3 +725,134 @@ async def get_order_by_id_full(order_id: str) -> Optional[Dict[str, Any]]:
         await conn.close()
 
 
+# ==================== REVIEWS FUNCTIONS ====================
+
+async def user_can_review_product(user_id: str, product_id: str) -> Optional[str]:
+    """
+    Verifica si el usuario puede hacer una reseña de un producto.
+    Solo puede reseñar si ha recibido el producto (status=DELIVERED).
+    Retorna el order_id si es válido, None si no puede reseñar.
+    """
+    conn = await get_connection()
+    try:
+        # Buscar un pedido DELIVERED que contenga este producto para este usuario
+        order = await conn.fetchrow(
+            """
+            SELECT o.id 
+            FROM orders o
+            JOIN order_items oi ON oi."orderId" = o.id
+            WHERE o."userId" = $1 
+              AND oi."productId" = $2 
+              AND o.status = 'DELIVERED'
+            LIMIT 1
+            """,
+            user_id, product_id
+        )
+        return str(order['id']) if order else None
+    finally:
+        await conn.close()
+
+
+async def create_review(
+    user_id: str, 
+    product_id: str, 
+    order_id: str, 
+    rating: int, 
+    comment: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Crear una reseña para un producto.
+    Lanza excepción si ya existe una reseña del usuario para ese producto.
+    """
+    conn = await get_connection()
+    try:
+        review_id = await conn.fetchval(
+            """
+            INSERT INTO reviews (id, "userId", "productId", "orderId", rating, comment, "createdAt", "updatedAt")
+            VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NOW(), NOW())
+            RETURNING id
+            """,
+            user_id, product_id, order_id, rating, comment
+        )
+        
+        review = await conn.fetchrow(
+            """
+            SELECT 
+                r.id, 
+                r."userId", 
+                r."productId", 
+                r."orderId", 
+                r.rating, 
+                r.comment, 
+                r."createdAt",
+                u.name as user_name
+            FROM reviews r
+            JOIN users u ON r."userId" = u.id
+            WHERE r.id = $1
+            """,
+            review_id
+        )
+        return convert_uuid_to_str(dict(review)) if review else None
+    finally:
+        await conn.close()
+
+
+async def get_product_reviews(product_id: str) -> Dict[str, Any]:
+    """
+    Obtener todas las reseñas de un producto con estadísticas.
+    Retorna: {reviews: [...], average: float, total: int}
+    """
+    conn = await get_connection()
+    try:
+        # Obtener todas las reseñas del producto
+        reviews = await conn.fetch(
+            """
+            SELECT 
+                r.id, 
+                r."userId", 
+                r."productId", 
+                r."orderId", 
+                r.rating, 
+                r.comment, 
+                r."createdAt",
+                u.name as user_name
+            FROM reviews r
+            JOIN users u ON r."userId" = u.id
+            WHERE r."productId" = $1
+            ORDER BY r."createdAt" DESC
+            """,
+            product_id
+        )
+        
+        reviews_list = [convert_uuid_to_str(dict(row)) for row in reviews]
+        
+        # Calcular estadísticas
+        total = len(reviews_list)
+        average = sum(r['rating'] for r in reviews_list) / total if total > 0 else 0
+        
+        return {
+            "reviews": reviews_list,
+            "average": round(average, 1),
+            "total": total
+        }
+    finally:
+        await conn.close()
+
+
+async def check_user_reviewed_product(user_id: str, product_id: str) -> bool:
+    """
+    Verifica si el usuario ya ha hecho una reseña de este producto.
+    """
+    conn = await get_connection()
+    try:
+        review = await conn.fetchrow(
+            """
+            SELECT id FROM reviews 
+            WHERE "userId" = $1 AND "productId" = $2
+            LIMIT 1
+            """,
+            user_id, product_id
+        )
+        return review is not None
+    finally:
+        await conn.close()
