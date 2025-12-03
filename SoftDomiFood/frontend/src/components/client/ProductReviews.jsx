@@ -12,6 +12,23 @@ const ProductReviews = ({ productId }) => {
     loadReviews();
   }, [productId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Escuchar evento global 'review-submitted' para refrescar lista cuando se crea una reseña
+  useEffect(() => {
+    const handler = (e) => {
+      try {
+        const pid = e?.detail?.productId;
+        if (pid && pid === productId) {
+          loadReviews();
+        }
+      } catch (err) {
+        // ignore
+      }
+    };
+
+    window.addEventListener('review-submitted', handler);
+    return () => window.removeEventListener('review-submitted', handler);
+  }, [productId]);
+
   const loadReviews = async () => {
     try {
       setLoading(true);

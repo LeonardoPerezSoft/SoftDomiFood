@@ -21,6 +21,10 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
     addressId: '',
     paymentMethod: 'CASH'
   });
+  // ✅ Pedido programado
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduledFor, setScheduledFor] = useState(""); // formato datetime-local: yyyy-mm-ddThh:mm
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [isCartVisible, setIsCartVisible] = useState(true);
@@ -262,6 +266,11 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
       return;
     }
 
+    if (scheduleEnabled && !scheduledFor) {
+      toast.warning('Debes elegir la fecha y hora para programar el pedido');
+      return;
+    }
+
     // Validación estricta: solo usuarios autenticados pueden crear pedidos
     const token = localStorage.getItem('clientToken');
     if (!token || !user) {
@@ -288,12 +297,17 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
         addressId: orderForm.addressId,
         paymentMethod: orderForm.paymentMethod,
         notes: orderForm.notes || null,
-        total: total  // Incluir el total calculado
+        total: total,  // Incluir el total calculado
+        couponCode: appliedCoupon ? appliedCoupon.code : null,
+        scheduledFor: scheduleEnabled && scheduledFor ? scheduledFor : null,
       };
 
       await ordersAPI.create(orderData);
       setCart([]);
+      setAppliedCoupon(null);  // Limpiar cupón aplicado
       setOrderForm({ notes: '', addressId: '', paymentMethod: 'CASH' });
+      setScheduleEnabled(false);
+      setScheduledFor("");
       toast.success('¡Pedido realizado con éxito!');
       loadOrders();
       setActiveTab('orders'); // Cambiar a la pestaña de pedidos
@@ -317,6 +331,8 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
     setAddresses([]);
     setOrders([]);
     setCart([]);
+    setScheduleEnabled(false);
+    setScheduledFor("");
     setActiveTab('menu');
     toast.info('Sesión cerrada correctamente');
   };
@@ -429,6 +445,9 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
                   onUpdateQuantity={updateQuantity}
                   onRemoveFromCart={removeFromCart}
                   totalPrice={getTotalPrice()}
+                  onCouponApplied={setAppliedCoupon}
+                  appliedCoupon={appliedCoupon}
+                  toast={toast}
                 />
               )}
 
@@ -442,6 +461,11 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
                   onPlaceOrder={handlePlaceOrder}
                   onAddressAdded={handleAddressAdded}
                   disabled={cart.length === 0 || !user}
+                  // Schedule props
+                  scheduleEnabled={scheduleEnabled}
+                  scheduledFor={scheduledFor}
+                  onScheduleEnabledChange={setScheduleEnabled}
+                  onScheduledForChange={setScheduledFor}
                 />
               )}
             </div>

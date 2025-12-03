@@ -41,3 +41,9 @@ database/backups/backup_*.sql
 .dockerignore
 
 .vscode/
+
+**/venv/
+**/env/
+__pycache__/
+*.pyc
+

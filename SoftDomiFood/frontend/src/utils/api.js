@@ -173,4 +173,12 @@ export const favoritesAPI = {
   },
 };
 
+// Coupons
+export const couponsAPI = {
+  validate: async (code) => {
+    const response = await api.post('/coupons/validate', { code });
+    return response.data;
+  },
+};
+
 export default api;

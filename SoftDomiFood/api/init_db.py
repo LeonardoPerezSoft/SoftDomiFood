@@ -162,6 +162,35 @@ CREATE TABLE IF NOT EXISTS "coupon_usages" (
 CREATE INDEX IF NOT EXISTS idx_coupons_code ON "coupons"(code);
 CREATE INDEX IF NOT EXISTS idx_coupon_usages_coupon_id ON "coupon_usages"(coupon_id);
 CREATE INDEX IF NOT EXISTS idx_coupon_usages_user_id ON "coupon_usages"(user_id);
+
+-- Tabla favorites
+CREATE TABLE IF NOT EXISTS "favorites" (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "userId" UUID NOT NULL,
+    "productId" UUID NOT NULL,
+    "createdAt" TIMESTAMP DEFAULT NOW(),
+    CONSTRAINT fk_favorite_user FOREIGN KEY ("userId") REFERENCES "users"(id) ON DELETE CASCADE,
+    CONSTRAINT fk_favorite_product FOREIGN KEY ("productId") REFERENCES "products"(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON "favorites"("userId");
+
+-- Tabla reviews
+CREATE TABLE IF NOT EXISTS "reviews" (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "userId" UUID NOT NULL,
+    "productId" UUID NOT NULL,
+    "orderId" UUID NOT NULL,
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    comment TEXT,
+    "createdAt" TIMESTAMP DEFAULT NOW(),
+    "updatedAt" TIMESTAMP DEFAULT NOW(),
+    CONSTRAINT fk_review_user FOREIGN KEY ("userId") REFERENCES "users"(id) ON DELETE CASCADE,
+    CONSTRAINT fk_review_product FOREIGN KEY ("productId") REFERENCES "products"(id) ON DELETE CASCADE,
+    CONSTRAINT uq_review_unique UNIQUE ("userId", "productId")
+);
+
+CREATE INDEX IF NOT EXISTS idx_reviews_product_id ON "reviews"("productId");
 """
 
 async def create_admin_user():
@@ -222,7 +251,7 @@ async def init_database():
             print("✅ Base de datos inicializada correctamente")
             
             # Verificar que todas las tablas se crearon
-            tables_to_check = ['users', 'products', 'addresses', 'orders', 'order_items', 'coupons', 'coupon_usages']
+            tables_to_check = ['users', 'products', 'addresses', 'orders', 'order_items', 'coupons', 'coupon_usages', 'favorites', 'reviews']
             for table in tables_to_check:
                 exists = await conn.fetchval("""
                     SELECT EXISTS (
@@ -257,7 +286,7 @@ async def check_tables_exist() -> bool:
         conn = await asyncpg.connect(DATABASE_URL)
         try:
             # Verificar si existen todas las tablas necesarias
-            tables_to_check = ['users', 'products', 'addresses', 'orders', 'order_items', 'coupons', 'coupon_usages']
+            tables_to_check = ['users', 'products', 'addresses', 'orders', 'order_items', 'coupons', 'coupon_usages', 'favorites', 'reviews']
             for table in tables_to_check:
                 result = await conn.fetchval("""
                     SELECT EXISTS (
