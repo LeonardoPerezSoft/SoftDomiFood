@@ -1,18 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Package, CheckCircle, X, CalendarClock, MapPin, DollarSign, CreditCard } from 'lucide-react';
+import { Clock, Package, CheckCircle, X, CalendarClock, MapPin, DollarSign, CreditCard, Star } from 'lucide-react';
 import { ordersAPI } from '../../utils/api';
+import ReviewModal from './ReviewModal';
 
 const MyOrders = ({ user, toast }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   useEffect(() => {
-    if (user) {
-      loadOrders();
-      const interval = setInterval(loadOrders, 10000);
-      return () => clearInterval(interval);
+    if (!user) return;
+    // Evitar auto-refresh mientras el modal de reseña está abierto
+    loadOrders();
+    let intervalId = null;
+    if (!reviewModalOpen) {
+      intervalId = setInterval(loadOrders, 10000);
     }
-  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [user, reviewModalOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadOrders = async () => {
     if (!user) return;
@@ -86,6 +94,21 @@ const MyOrders = ({ user, toast }) => {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const handleReviewClick = (item) => {
+    setSelectedProduct({
+      id: item.product_id || item.productId,
+      name: item.product_name || item.productName,
+      category: item.product_category || item.productCategory,
+      image: item.product_image || null,
+    });
+    setReviewModalOpen(true);
+  };
+
+  const handleReviewSubmitted = () => {
+    toast?.success?.('¡Gracias por tu reseña!');
+    loadOrders(); // Recargar pedidos
   };
 
   if (loading) {
@@ -178,16 +201,30 @@ const MyOrders = ({ user, toast }) => {
 
                 <div className="mb-3">
                   <p className="text-sm font-medium text-gray-700 mb-2">Productos:</p>
-                  <div className="text-sm text-gray-600 space-y-1">
+                  <div className="text-sm text-gray-600 space-y-2">
                     {items.length > 0 ? (
                       items.map((item, index) => (
-                        <div key={index} className="flex justify-between pl-4">
-                          <span>
-                            {item.quantity}x {item.product_name || item.productName || 'Producto'}
-                          </span>
-                          <span className="font-medium">
-                            ${((item.price || 0) * (item.quantity || 0)).toFixed(2)}
-                          </span>
+                        <div key={index} className="flex justify-between items-center pl-4 py-1">
+                          <div className="flex-1">
+                            <span>
+                              {item.quantity}x {item.product_name || item.productName || 'Producto'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="font-medium">
+                              ${((item.price || 0) * (item.quantity || 0)).toFixed(2)}
+                            </span>
+                            {/* Botón Calificar solo si el pedido está DELIVERED */}
+                            {status === 'delivered' && (
+                              <button
+                                onClick={() => handleReviewClick(item)}
+                                className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors"
+                              >
+                                <Star className="w-3.5 h-3.5" />
+                                Calificar
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))
                     ) : (
@@ -242,6 +279,19 @@ const MyOrders = ({ user, toast }) => {
             );
           })}
         </div>
+      )}
+
+      {/* Modal de Reseña */}
+      {selectedProduct && (
+        <ReviewModal
+          isOpen={reviewModalOpen}
+          onClose={() => {
+            setReviewModalOpen(false);
+            setSelectedProduct(null);
+          }}
+          product={selectedProduct}
+          onReviewSubmitted={handleReviewSubmitted}
+        />
       )}
     </div>
   );

@@ -115,8 +115,8 @@ async def create_new_order(
             scheduled_local = parse_client_datetime(order_data.scheduledFor)
             validate_schedule(scheduled_local)
 
-            # Guardamos en UTC (Postgres timestamptz lo maneja perfecto)
-            scheduled_for_dt = scheduled_local.astimezone(timezone.utc)
+            # Guardamos en UTC sin timezone info (Postgres timestamp without time zone)
+            scheduled_for_dt = scheduled_local.astimezone(timezone.utc).replace(tzinfo=None)
             status_value = "SCHEDULED"
 
         # Crear orden
