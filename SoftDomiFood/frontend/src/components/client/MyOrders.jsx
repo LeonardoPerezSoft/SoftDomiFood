@@ -1,23 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Package, CheckCircle, X, MapPin, DollarSign, CreditCard } from 'lucide-react';
+import { Clock, Package, CheckCircle, X, CalendarClock, MapPin, DollarSign, CreditCard, Star } from 'lucide-react';
 import { ordersAPI } from '../../utils/api';
+import ReviewModal from './ReviewModal';
 
 const MyOrders = ({ user, toast }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   useEffect(() => {
-    if (user) {
-      loadOrders();
-      // Recargar órdenes cada 10 segundos para ver actualizaciones
-      const interval = setInterval(loadOrders, 10000);
-      return () => clearInterval(interval);
+    if (!user) return;
+    // Evitar auto-refresh mientras el modal de reseña está abierto
+    loadOrders();
+    let intervalId = null;
+    if (!reviewModalOpen) {
+      intervalId = setInterval(loadOrders, 10000);
     }
-  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [user, reviewModalOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadOrders = async () => {
     if (!user) return;
-    
+
     try {
       setLoading(true);
       const data = await ordersAPI.getAll();
@@ -25,7 +32,7 @@ const MyOrders = ({ user, toast }) => {
       setOrders(ordersList);
     } catch (error) {
       console.error('Error loading orders:', error);
-      toast.error('Error al cargar tus pedidos');
+      toast?.error?.('Error al cargar tus pedidos');
       setOrders([]);
     } finally {
       setLoading(false);
@@ -33,8 +40,9 @@ const MyOrders = ({ user, toast }) => {
   };
 
   const getStatusColor = (status) => {
-    const statusLower = status?.toLowerCase();
-    switch (statusLower) {
+    const s = status?.toLowerCase();
+    switch (s) {
+      case 'scheduled': return 'bg-blue-100 text-blue-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'confirmed': return 'bg-blue-100 text-blue-800';
       case 'preparing': return 'bg-blue-100 text-blue-800';
@@ -47,8 +55,9 @@ const MyOrders = ({ user, toast }) => {
   };
 
   const getStatusIcon = (status) => {
-    const statusLower = status?.toLowerCase();
-    switch (statusLower) {
+    const s = status?.toLowerCase();
+    switch (s) {
+      case 'scheduled': return <CalendarClock className="w-4 h-4" />;
       case 'pending': return <Clock className="w-4 h-4" />;
       case 'confirmed': return <Clock className="w-4 h-4" />;
       case 'preparing': return <Package className="w-4 h-4" />;
@@ -61,17 +70,18 @@ const MyOrders = ({ user, toast }) => {
   };
 
   const getStatusText = (status) => {
-    const statusLower = status?.toLowerCase();
-    const statusMap = {
-      'pending': 'Pendiente',
-      'confirmed': 'Confirmado',
-      'preparing': 'En Preparación',
-      'ready': 'Listo',
-      'on_delivery': 'En Camino',
-      'delivered': 'Entregado',
-      'cancelled': 'Cancelado'
+    const s = status?.toLowerCase();
+    const map = {
+      scheduled: 'Programado',
+      pending: 'Pendiente',
+      confirmed: 'Confirmado',
+      preparing: 'En Preparación',
+      ready: 'Listo',
+      on_delivery: 'En Camino',
+      delivered: 'Entregado',
+      cancelled: 'Cancelado',
     };
-    return statusMap[statusLower] || status;
+    return map[s] || status;
   };
 
   const formatDate = (dateString) => {
@@ -84,6 +94,21 @@ const MyOrders = ({ user, toast }) => {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const handleReviewClick = (item) => {
+    setSelectedProduct({
+      id: item.product_id || item.productId,
+      name: item.product_name || item.productName,
+      category: item.product_category || item.productCategory,
+      image: item.product_image || null,
+    });
+    setReviewModalOpen(true);
+  };
+
+  const handleReviewSubmitted = () => {
+    toast?.success?.('¡Gracias por tu reseña!');
+    loadOrders(); // Recargar pedidos
   };
 
   if (loading) {
@@ -122,7 +147,7 @@ const MyOrders = ({ user, toast }) => {
           {orders.map((order) => {
             const status = (order.status || 'PENDING').toLowerCase();
             const items = order.items || [];
-            
+
             return (
               <div
                 key={order.id}
@@ -133,19 +158,36 @@ const MyOrders = ({ user, toast }) => {
                     <h3 className="font-semibold text-gray-800">
                       Pedido #{order.id.substring(0, 8)}
                     </h3>
+
                     <p className="text-sm text-gray-600 mt-1">
                       Fecha: {formatDate(order.createdAt)}
                     </p>
+
+                    {/* ✅ Programado para */}
+                    {order.scheduledFor && (
+                      <p className="text-sm text-blue-700 mt-1 flex items-center gap-1">
+                        <CalendarClock className="w-4 h-4" />
+                        Programado para: {formatDate(order.scheduledFor)}
+                      </p>
+                    )}
                   </div>
+
                   <div className="flex items-center space-x-2">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(status)}`}
+                    >
                       {getStatusIcon(status)}
                       <span className="ml-1">{getStatusText(status)}</span>
                     </span>
+
                     {order.paymentMethod && (
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        order.paymentMethod === 'CARD' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                      }`}>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          order.paymentMethod === 'CARD'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-green-100 text-green-800'
+                        }`}
+                      >
                         {order.paymentMethod === 'CARD' ? (
                           <CreditCard className="w-3 h-3 mr-1" />
                         ) : (
@@ -159,16 +201,30 @@ const MyOrders = ({ user, toast }) => {
 
                 <div className="mb-3">
                   <p className="text-sm font-medium text-gray-700 mb-2">Productos:</p>
-                  <div className="text-sm text-gray-600 space-y-1">
+                  <div className="text-sm text-gray-600 space-y-2">
                     {items.length > 0 ? (
                       items.map((item, index) => (
-                        <div key={index} className="flex justify-between pl-4">
-                          <span>
-                            {item.quantity}x {item.product_name || item.productName || 'Producto'}
-                          </span>
-                          <span className="font-medium">
-                            ${((item.price || 0) * (item.quantity || 0)).toFixed(2)}
-                          </span>
+                        <div key={index} className="flex justify-between items-center pl-4 py-1">
+                          <div className="flex-1">
+                            <span>
+                              {item.quantity}x {item.product_name || item.productName || 'Producto'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="font-medium">
+                              ${((item.price || 0) * (item.quantity || 0)).toFixed(2)}
+                            </span>
+                            {/* Botón Calificar solo si el pedido está DELIVERED */}
+                            {status === 'delivered' && (
+                              <button
+                                onClick={() => handleReviewClick(item)}
+                                className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors"
+                              >
+                                <Star className="w-3.5 h-3.5" />
+                                Calificar
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))
                     ) : (
@@ -177,14 +233,39 @@ const MyOrders = ({ user, toast }) => {
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center pt-3 border-t border-gray-200">
-                  <div className="flex items-center text-sm text-gray-600">
+                <div className="pt-3 border-t border-gray-200">
+                  <div className="flex items-center text-sm text-gray-600 mb-3">
                     <MapPin className="w-4 h-4 mr-1" />
                     <span>Dirección de entrega registrada</span>
                   </div>
-                  <p className="font-bold text-lg text-gray-800">
-                    Total: ${(parseFloat(order.total) || 0).toFixed(2)}
-                  </p>
+
+                  <div className="space-y-2">
+                    {order.coupon_code && order.discount_applied > 0 ? (
+                      <>
+                        <div className="flex justify-between text-sm text-gray-600">
+                          <span>Subtotal:</span>
+                          <span>
+                            ${(
+                              (parseFloat(order.total) || 0) + (parseFloat(order.discount_applied) || 0)
+                            ).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm text-green-600 font-medium">
+                          <span>Cupón aplicado ({order.coupon_code}):</span>
+                          <span>-${(parseFloat(order.discount_applied) || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between font-bold text-lg text-gray-800 pt-2 border-t border-gray-200">
+                          <span>Total:</span>
+                          <span>${(parseFloat(order.total) || 0).toFixed(2)}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex justify-between font-bold text-lg text-gray-800">
+                        <span>Total:</span>
+                        <span>${(parseFloat(order.total) || 0).toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {order.notes && (
@@ -199,9 +280,21 @@ const MyOrders = ({ user, toast }) => {
           })}
         </div>
       )}
+
+      {/* Modal de Reseña */}
+      {selectedProduct && (
+        <ReviewModal
+          isOpen={reviewModalOpen}
+          onClose={() => {
+            setReviewModalOpen(false);
+            setSelectedProduct(null);
+          }}
+          product={selectedProduct}
+          onReviewSubmitted={handleReviewSubmitted}
+        />
+      )}
     </div>
   );
 };
 
 export default MyOrders;
-
