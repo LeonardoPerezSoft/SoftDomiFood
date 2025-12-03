@@ -6,15 +6,17 @@ import OrderForm from '../components/client/OrderForm';
 import MyOrders from '../components/client/MyOrders';
 import FavoritesList from '../components/client/FavoritesList';
 import { authAPI, productsAPI, ordersAPI, addressesAPI, favoritesAPI } from '../utils/api';
+import { useFavorites } from '../hooks/useFavorites';
 
 const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = false }) => {
+  // Use the useFavorites hook
+  const { favorites, isFavorite, toggleFavorite, error: favoritesError } = useFavorites();
+  
   const [user, setUser] = useState(null);
   const [cart, setCart] = useState([]);
   const [products, setProducts] = useState([]);
   const [addresses, setAddresses] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [favorites, setFavorites] = useState([]);
-  const [favoriteIds, setFavoriteIds] = useState([]);
   const [activeTab, setActiveTab] = useState('menu');
   const [orderForm, setOrderForm] = useState({
     notes: '',
@@ -76,7 +78,7 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
     if (!isAdminView) {
       loadAddresses();
       loadOrders();
-      loadFavorites();
+      // useFavorites hook loads automatically
       checkAuth();
     }
     // Removido el caso de adminUser ya que esta es solo la app de cliente
@@ -154,51 +156,22 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
     }));
   };
 
-  const loadFavorites = async () => {
-    // Si es vista de admin, no cargar favoritos
-    if (isAdminView) {
-      return;
-    }
-    
-    const token = localStorage.getItem('clientToken');
-    if (!token) return; // Skip if not authenticated
-    
-    try {
-      const data = await favoritesAPI.getAll();
-      const favoritesList = data.favorites || [];
-      setFavorites(favoritesList);
-      setFavoriteIds(favoritesList.map(fav => fav.id));
-    } catch (error) {
-      console.error('Error loading favorites:', error);
-      setFavorites([]);
-      setFavoriteIds([]);
-    }
-  };
-
   const handleToggleFavorite = async (productId) => {
     if (!user) {
       toast.error('Debes iniciar sesión para agregar favoritos');
       return;
     }
 
-    const isFavorite = favoriteIds.includes(productId);
-
     try {
-      if (isFavorite) {
-        await favoritesAPI.remove(productId);
-        setFavorites(prev => prev.filter(fav => fav.id !== productId));
-        setFavoriteIds(prev => prev.filter(id => id !== productId));
+      await toggleFavorite(productId);
+      if (isFavorite(productId)) {
         toast.success('Producto eliminado de favoritos');
       } else {
-        const result = await favoritesAPI.add(productId);
-        const newFavorite = result.favorite;
-        setFavorites(prev => [...prev, newFavorite]);
-        setFavoriteIds(prev => [...prev, productId]);
         toast.success('Producto agregado a favoritos');
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
-      toast.error(error.response?.data?.message || 'Error al gestionar favorito');
+      toast.error(favoritesError || 'Error al gestionar favorito');
     }
   };
 
@@ -428,7 +401,7 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
                       key={product.id}
                       product={product}
                       onAddToCart={addToCart}
-                      isFavorite={favoriteIds.includes(product.id)}
+                      isFavorite={isFavorite(product.id)}
                       onToggleFavorite={handleToggleFavorite}
                       isAuthenticated={!!user}
                     />
@@ -472,10 +445,10 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
           </div>
         ) : activeTab === 'favorites' ? (
           <FavoritesList
-            favorites={favorites}
+            favorites={products.filter(p => isFavorite(p.id))}
             onAddToCart={addToCart}
             onToggleFavorite={handleToggleFavorite}
-            favoriteIds={favoriteIds}
+            favoriteIds={favorites}
             isAuthenticated={!!user}
           />
         ) : (
