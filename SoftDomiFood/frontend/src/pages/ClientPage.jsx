@@ -4,7 +4,8 @@ import ProductCard from '../components/client/ProductCard';
 import Cart from '../components/client/Cart';
 import OrderForm from '../components/client/OrderForm';
 import MyOrders from '../components/client/MyOrders';
-import { authAPI, productsAPI, ordersAPI, addressesAPI } from '../utils/api';
+import FavoritesList from '../components/client/FavoritesList';
+import { authAPI, productsAPI, ordersAPI, addressesAPI, favoritesAPI } from '../utils/api';
 
 const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = false }) => {
   const [user, setUser] = useState(null);
@@ -12,10 +13,8 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
   const [products, setProducts] = useState([]);
   const [addresses, setAddresses] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
-    // ✅ Pedido programado
-  const [scheduleEnabled, setScheduleEnabled] = useState(false);
-  const [scheduledFor, setScheduledFor] = useState(""); // formato datetime-local: yyyy-mm-ddThh:mm
+  const [favorites, setFavorites] = useState([]);
+  const [favoriteIds, setFavoriteIds] = useState([]);
   const [activeTab, setActiveTab] = useState('menu');
   const [orderForm, setOrderForm] = useState({
     notes: '',
@@ -73,6 +72,7 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
     if (!isAdminView) {
       loadAddresses();
       loadOrders();
+      loadFavorites();
       checkAuth();
     }
     // Removido el caso de adminUser ya que esta es solo la app de cliente
@@ -150,6 +150,54 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
     }));
   };
 
+  const loadFavorites = async () => {
+    // Si es vista de admin, no cargar favoritos
+    if (isAdminView) {
+      return;
+    }
+    
+    const token = localStorage.getItem('clientToken');
+    if (!token) return; // Skip if not authenticated
+    
+    try {
+      const data = await favoritesAPI.getAll();
+      const favoritesList = data.favorites || [];
+      setFavorites(favoritesList);
+      setFavoriteIds(favoritesList.map(fav => fav.id));
+    } catch (error) {
+      console.error('Error loading favorites:', error);
+      setFavorites([]);
+      setFavoriteIds([]);
+    }
+  };
+
+  const handleToggleFavorite = async (productId) => {
+    if (!user) {
+      toast.error('Debes iniciar sesión para agregar favoritos');
+      return;
+    }
+
+    const isFavorite = favoriteIds.includes(productId);
+
+    try {
+      if (isFavorite) {
+        await favoritesAPI.remove(productId);
+        setFavorites(prev => prev.filter(fav => fav.id !== productId));
+        setFavoriteIds(prev => prev.filter(id => id !== productId));
+        toast.success('Producto eliminado de favoritos');
+      } else {
+        const result = await favoritesAPI.add(productId);
+        const newFavorite = result.favorite;
+        setFavorites(prev => [...prev, newFavorite]);
+        setFavoriteIds(prev => [...prev, productId]);
+        toast.success('Producto agregado a favoritos');
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      toast.error(error.response?.data?.message || 'Error al gestionar favorito');
+    }
+  };
+
   const loadOrders = async () => {
     // Si es vista de admin, no cargar pedidos del cliente
     if (isAdminView) {
@@ -208,11 +256,6 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
       toast.warning('Los administradores no pueden realizar pedidos desde esta vista');
       return;
     }
-
-        if (scheduleEnabled && !scheduledFor) {
-      toast.warning('Debes elegir la fecha y hora para programar el pedido');
-      return;
-    }
     
     if (cart.length === 0) {
       toast.warning('El carrito está vacío');
@@ -245,17 +288,12 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
         addressId: orderForm.addressId,
         paymentMethod: orderForm.paymentMethod,
         notes: orderForm.notes || null,
-        total: total,  // Incluir el total calculado
-        couponCode: appliedCoupon ? appliedCoupon.code : null,  // Incluir código de cupón si existe
-        scheduledFor: scheduleEnabled && scheduledFor ? scheduledFor : null,
+        total: total  // Incluir el total calculado
       };
 
       await ordersAPI.create(orderData);
       setCart([]);
-      setAppliedCoupon(null);  // Limpiar cupón aplicado
       setOrderForm({ notes: '', addressId: '', paymentMethod: 'CASH' });
-      setScheduleEnabled(false);  // Limpiar estado de programación
-      setScheduledFor("");  // Limpiar fecha programada
       toast.success('¡Pedido realizado con éxito!');
       loadOrders();
       setActiveTab('orders'); // Cambiar a la pestaña de pedidos
@@ -279,8 +317,6 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
     setAddresses([]);
     setOrders([]);
     setCart([]);
-    setScheduleEnabled(false);  // Limpiar estado de programación
-    setScheduledFor("");  // Limpiar fecha programada
     setActiveTab('menu');
     toast.info('Sesión cerrada correctamente');
   };
@@ -297,6 +333,7 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
       localStorage.setItem('lastView', 'client');
       loadAddresses();
       loadOrders();
+      loadFavorites();
     } catch (error) {
       console.error('Error logging in:', error);
       const errorMessage = error.response?.data?.detail || 'Error al iniciar sesión. Verifica tus credenciales.';
@@ -316,6 +353,7 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
         localStorage.setItem('lastView', 'client');
         loadAddresses();
         loadOrders();
+        loadFavorites();
       } else {
         toast.success('¡Registro exitoso! Ahora puedes iniciar sesión.');
         setShowRegister(false);
@@ -374,6 +412,9 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
                       key={product.id}
                       product={product}
                       onAddToCart={addToCart}
+                      isFavorite={favoriteIds.includes(product.id)}
+                      onToggleFavorite={handleToggleFavorite}
+                      isAuthenticated={!!user}
                     />
                   ))}
                 </div>
@@ -388,9 +429,6 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
                   onUpdateQuantity={updateQuantity}
                   onRemoveFromCart={removeFromCart}
                   totalPrice={getTotalPrice()}
-                  onCouponApplied={setAppliedCoupon}
-                  appliedCoupon={appliedCoupon}
-                  toast={toast}
                 />
               )}
 
@@ -404,17 +442,18 @@ const ClientPage = ({ switchToAdmin, toast, adminUser = null, isAdminView = fals
                   onPlaceOrder={handlePlaceOrder}
                   onAddressAdded={handleAddressAdded}
                   disabled={cart.length === 0 || !user}
-                  toast={toast}
-
-                  // ✅ NUEVO
-                  scheduleEnabled={scheduleEnabled}
-                  scheduledFor={scheduledFor}
-                  onScheduleEnabledChange={setScheduleEnabled}
-                  onScheduledForChange={setScheduledFor}
                 />
               )}
             </div>
           </div>
+        ) : activeTab === 'favorites' ? (
+          <FavoritesList
+            favorites={favorites}
+            onAddToCart={addToCart}
+            onToggleFavorite={handleToggleFavorite}
+            favoriteIds={favoriteIds}
+            isAuthenticated={!!user}
+          />
         ) : (
           !isAdminView && <MyOrders user={user} toast={toast} />
         )}

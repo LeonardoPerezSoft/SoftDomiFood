@@ -150,10 +150,25 @@ export const addressesAPI = {
   },
 };
 
-// Coupons
-export const couponsAPI = {
-  validate: async (couponCode) => {
-    const response = await api.post('/coupons/validate', { code: couponCode });
+// Favorites
+export const favoritesAPI = {
+  getAll: async () => {
+    const response = await api.get('/favorites');
+    return response.data;
+  },
+
+  add: async (productId) => {
+    const response = await api.post('/favorites', { productId });
+    return response.data;
+  },
+
+  remove: async (productId) => {
+    const response = await api.delete(`/favorites/${productId}`);
+    return response.data;
+  },
+
+  check: async (productId) => {
+    const response = await api.get(`/favorites/check/${productId}`);
     return response.data;
   },
 };
