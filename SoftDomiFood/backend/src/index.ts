@@ -9,6 +9,7 @@ import productRoutes from './routes/product.routes';
 import orderRoutes from './routes/order.routes';
 import addressRoutes from './routes/address.routes';
 import paymentRoutes from './routes/payment.routes';
+import favoriteRoutes from './routes/favorite.routes';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -31,6 +32,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/addresses', addressRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/favorites', favoriteRoutes);
 
 // Ruta de salud
 app.get('/api/health', (req, res) => {

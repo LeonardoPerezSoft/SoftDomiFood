@@ -64,11 +64,11 @@ async function main() {
   console.log(`✅ Created ${products.length} products`);
 
   // Crear usuario admin de ejemplo
-  const hashedPassword = await bcrypt.hash('admin123', 10);
+  const hashedAdminPassword = await bcrypt.hash('admin123', 10);
   const admin = await prisma.user.create({
     data: {
       email: 'admin@salchipapas.com',
-      password: hashedPassword,
+      password: hashedAdminPassword,
       name: 'Admin',
       role: 'ADMIN'
     }
@@ -77,6 +77,22 @@ async function main() {
   console.log('✅ Created admin user');
   console.log('📧 Email: admin@salchipapas.com');
   console.log('🔑 Password: admin123');
+
+  // Crear usuario cliente para testing
+  const hashedClientPassword = await bcrypt.hash('cliente123', 10);
+  const client = await prisma.user.create({
+    data: {
+      email: 'cliente@test.com',
+      password: hashedClientPassword,
+      name: 'Cliente Test',
+      phone: '+57 300 1234567',
+      role: 'CUSTOMER'
+    }
+  });
+
+  console.log('✅ Created client user for testing');
+  console.log('📧 Email: cliente@test.com');
+  console.log('🔑 Password: cliente123');
 
   console.log('✨ Seeding completed!');
 }

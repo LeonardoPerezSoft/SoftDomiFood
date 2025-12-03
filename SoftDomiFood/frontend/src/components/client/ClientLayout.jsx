@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShoppingCart, User, LogOut, ChevronDown } from 'lucide-react';
+import { ShoppingCart, User, LogOut, ChevronDown, Heart } from 'lucide-react';
 
 const ClientLayout = ({ children, user, cartCount, onLogin, onCartClick, onLogout, activeTab, setActiveTab }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -32,6 +32,17 @@ const ClientLayout = ({ children, user, cartCount, onLogin, onCartClick, onLogou
                     }`}
                   >
                     Menú
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('favorites')}
+                    className={`px-4 py-2 text-sm font-medium transition-colors flex items-center gap-1 ${
+                      activeTab === 'favorites'
+                        ? 'text-orange-600 border-b-2 border-orange-600'
+                        : 'text-gray-600 hover:text-gray-800'
+                    }`}
+                  >
+                    <Heart className="w-4 h-4" />
+                    Favoritos
                   </button>
                   <button
                     onClick={() => setActiveTab('orders')}
