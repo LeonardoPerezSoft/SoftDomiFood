@@ -944,3 +944,51 @@ async def check_favorite(user_id: str, product_id: str) -> bool:
         return bool(row)
     finally:
         await conn.close()
+
+
+async def get_all_reviews() -> list:
+    """
+    Obtener todas las reseñas del sistema con información de usuario y producto.
+    """
+    conn = await get_connection()
+    try:
+        reviews = await conn.fetch(
+            """
+            SELECT 
+                r.id, 
+                r."userId", 
+                r."productId", 
+                r."orderId", 
+                r.rating, 
+                r.comment, 
+                r."createdAt",
+                u.name as user_name,
+                u.email as user_email,
+                p.name as product_name,
+                p.price as product_price
+            FROM reviews r
+            JOIN users u ON r."userId" = u.id
+            JOIN products p ON r."productId" = p.id
+            ORDER BY r."createdAt" DESC
+            """
+        )
+        
+        return [convert_uuid_to_str(dict(row)) for row in reviews]
+    finally:
+        await conn.close()
+
+
+async def delete_review(review_id: str) -> bool:
+    """
+    Eliminar una reseña (admin only)
+    """
+    conn = await get_connection()
+    try:
+        result = await conn.execute(
+            'DELETE FROM reviews WHERE id = $1',
+            review_id
+        )
+        return result.upper().startswith('DELETE')
+    finally:
+        await conn.close()
+
