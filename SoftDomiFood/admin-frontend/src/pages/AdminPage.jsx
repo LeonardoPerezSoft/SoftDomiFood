@@ -4,18 +4,20 @@ import OrderManagement from '../components/admin/OrderManagement';
 import ProductManagement from '../components/admin/ProductManagement';
 import CustomerManagement from '../components/admin/CustomerManagement';
 import CouponManagement from '../components/admin/CouponManagement';
+import ReviewsManagement from '../components/admin/ReviewsManagement';
 import StatsCard from '../components/admin/StatsCard';
 import { adminAPI, productsAPI } from '../utils/api';
-import { Package2, DollarSign, Edit, User, Ticket } from 'lucide-react';
+import { Package2, DollarSign, Edit, User, Ticket, MessageSquare } from 'lucide-react';
 
 const AdminPage = ({ switchToClient, adminUser, onLogout, toast }) => {
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [coupons, setCoupons] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [stats, setStats] = useState({ todayOrders: 0, todayRevenue: 0 });
   const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState('orders'); // 'orders', 'products', 'customers', 'coupons'
+  const [activeView, setActiveView] = useState('orders'); // 'orders', 'products', 'customers', 'coupons', 'reviews'
 
   // Load real data from API
   useEffect(() => {
@@ -32,7 +34,7 @@ const AdminPage = ({ switchToClient, adminUser, onLogout, toast }) => {
   const loadData = async () => {
     setLoading(true);
     try {
-      await Promise.all([loadProducts(), loadOrders(), loadCustomers(), loadCoupons()]);
+      await Promise.all([loadProducts(), loadOrders(), loadCustomers(), loadCoupons(), loadReviews()]);
     } catch (error) {
       console.error('Error loading admin data:', error);
     } finally {
@@ -59,6 +61,17 @@ const AdminPage = ({ switchToClient, adminUser, onLogout, toast }) => {
     } catch (error) {
       console.error('Error loading coupons:', error);
       setCoupons([]);
+    }
+  };
+
+  const loadReviews = async () => {
+    try {
+      const data = await adminAPI.reviews.getAll();
+      const reviewsList = data.reviews || data || [];
+      setReviews(reviewsList);
+    } catch (error) {
+      console.error('Error loading reviews:', error);
+      setReviews([]);
     }
   };
 
@@ -243,6 +256,20 @@ const AdminPage = ({ switchToClient, adminUser, onLogout, toast }) => {
     }
   };
 
+  const handleDeleteReview = async (reviewId) => {
+    try {
+      await adminAPI.reviews.delete(reviewId);
+      await loadReviews();
+      toast.success('Reseña eliminada correctamente');
+      return true;
+    } catch (error) {
+      console.error('Error deleting review:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Error al eliminar la reseña';
+      toast.error(errorMessage);
+      return false;
+    }
+  };
+
   if (loading) {
     return (
       <AdminLayout switchToClient={switchToClient} adminUser={adminUser} onLogout={onLogout}>
@@ -308,6 +335,17 @@ const AdminPage = ({ switchToClient, adminUser, onLogout, toast }) => {
                 <Ticket className="w-4 h-4" />
                 <span>Cupones</span>
               </button>
+              <button
+                onClick={() => setActiveView('reviews')}
+                className={`w-full flex items-center space-x-2 p-2 rounded-lg transition-colors ${
+                  activeView === 'reviews'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>Reseñas</span>
+              </button>
             </nav>
           </div>
 
@@ -359,6 +397,14 @@ const AdminPage = ({ switchToClient, adminUser, onLogout, toast }) => {
               onAddCoupon={handleAddCoupon}
               onEditCoupon={handleEditCoupon}
               onDeleteCoupon={handleDeleteCoupon}
+            />
+          )}
+
+          {activeView === 'reviews' && (
+            <ReviewsManagement
+              reviews={reviews}
+              onDelete={handleDeleteReview}
+              isLoading={loading}
             />
           )}
         </div>

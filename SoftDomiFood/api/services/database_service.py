@@ -856,3 +856,91 @@ async def check_user_reviewed_product(user_id: str, product_id: str) -> bool:
         return review is not None
     finally:
         await conn.close()
+
+
+async def get_user_favorites(user_id: str) -> List[Dict[str, Any]]:
+    """Obtener lista de favoritos de un usuario (incluye info del producto)"""
+    conn = await get_connection()
+    try:
+        rows = await conn.fetch(
+            """
+            SELECT f.id, f."productId", p.name as product_name, p.description as product_description, p.price, p.image, p.category
+            FROM favorites f
+            JOIN products p ON f."productId" = p.id
+            WHERE f."userId" = $1
+            ORDER BY f."createdAt" DESC
+            """,
+            user_id
+        )
+        favorites = []
+        for r in rows:
+            d = convert_uuid_to_str(dict(r))
+            # normalize keys similar to frontend expectations
+            d['id'] = d.get('id')
+            d['productId'] = d.get('productId')
+            favorites.append(d)
+        return favorites
+    finally:
+        await conn.close()
+
+
+async def add_favorite(user_id: str, product_id: str) -> Optional[Dict[str, Any]]:
+    """Agregar favorito (si no existe) y retornar el registro con info del producto"""
+    conn = await get_connection()
+    try:
+        # Verificar existencia
+        existing = await conn.fetchrow(
+            'SELECT id FROM favorites WHERE "userId" = $1 AND "productId" = $2',
+            user_id, product_id
+        )
+        if existing:
+            # retornar el favorito existente
+            fav = await conn.fetchrow(
+                'SELECT id, "userId", "productId", "createdAt" FROM favorites WHERE id = $1',
+                existing['id']
+            )
+            return convert_uuid_to_str(dict(fav)) if fav else None
+
+        fav_id = await conn.fetchval(
+            'INSERT INTO favorites (id, "userId", "productId", "createdAt") VALUES (gen_random_uuid(), $1, $2, NOW()) RETURNING id',
+            user_id, product_id
+        )
+
+        fav = await conn.fetchrow(
+            """
+            SELECT f.id, f."userId", f."productId", f."createdAt", p.name as product_name, p.description as product_description, p.price, p.image
+            FROM favorites f
+            JOIN products p ON f."productId" = p.id
+            WHERE f.id = $1
+            """,
+            fav_id
+        )
+        return convert_uuid_to_str(dict(fav)) if fav else None
+    finally:
+        await conn.close()
+
+
+async def remove_favorite(user_id: str, product_id: str) -> bool:
+    """Remover favorito por usuario y producto"""
+    conn = await get_connection()
+    try:
+        result = await conn.execute(
+            'DELETE FROM favorites WHERE "userId" = $1 AND "productId" = $2',
+            user_id, product_id
+        )
+        return result.upper().startswith('DELETE')
+    finally:
+        await conn.close()
+
+
+async def check_favorite(user_id: str, product_id: str) -> bool:
+    """Verificar si un producto está en favoritos de un usuario"""
+    conn = await get_connection()
+    try:
+        row = await conn.fetchrow(
+            'SELECT id FROM favorites WHERE "userId" = $1 AND "productId" = $2 LIMIT 1',
+            user_id, product_id
+        )
+        return bool(row)
+    finally:
+        await conn.close()
