@@ -116,6 +116,18 @@ export const adminAPI = {
       return response.data;
     },
   },
+
+  // Reviews
+  reviews: {
+    getAll: async () => {
+      const response = await api.get('/admin/reviews');
+      return response.data;
+    },
+    delete: async (reviewId) => {
+      const response = await api.delete(`/admin/reviews/${reviewId}`);
+      return response.data;
+    },
+  },
 };
 
 export default api;
